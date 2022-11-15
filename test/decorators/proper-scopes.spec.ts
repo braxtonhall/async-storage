@@ -10,6 +10,9 @@ const mutate = async (key: string, value: string): Promise<string> => scopes.mut
 describe("scopes", () => {
 
 	it("should not have anything in global scope from the beginning", async () => {
+		/**
+		 * foo; // unbound identifier!
+		 */
 		const key = randomUUID();
 		try {
 			await access(key);
@@ -21,6 +24,11 @@ describe("scopes", () => {
 	});
 
 	it("should not have anything in a nested scope from the beginning", async () => {
+		/**
+		 * {
+		 *     foo; // unbound identifier!
+		 * }
+		 */
 		const key = randomUUID();
 		try {
 			await declareScope(() => Promise.resolve().then(() => access(key)));
@@ -32,6 +40,9 @@ describe("scopes", () => {
 	});
 
 	it("should not be able to mutate unbound identifiers in the global scope", async () => {
+		/**
+		 * foo = "bar"; // unbound identifier!
+		 */
 		const key = randomUUID();
 		const value = randomUUID();
 		try {
@@ -44,6 +55,11 @@ describe("scopes", () => {
 	});
 
 	it("should not be able to mutate unbound identifiers in a nested scope", async () => {
+		/**
+		 * {
+		 *     foo = "bar"; // unbound identifier!
+		 * }
+		 */
 		const key = randomUUID();
 		const value = randomUUID();
 		try {
@@ -55,7 +71,24 @@ describe("scopes", () => {
 		expect.fail("Access should have caused an unbound identifier error");
 	});
 
-	it("should be able to bind values in scope", async () => {
+	it("should be able to bind values in global scope", async () => {
+		/**
+		 * let foo = "bar";
+		 * foo; // "bar"
+		 */
+		const key = randomUUID();
+		const value = randomUUID();
+		await bind(key, value);
+		expect(await access(key)).to.equal(value);
+	});
+
+	it("should be able to bind values in nested scope", async () => {
+		/**
+		 * {
+		 *     let foo = "bar";
+		 *     foo; // "bar"
+		 * }
+		 */
 		const key = randomUUID();
 		const value = randomUUID();
 		const futureResult = declareScope(() => Promise.resolve()
@@ -65,6 +98,14 @@ describe("scopes", () => {
 	});
 
 	it("should be able to set multiple values in scope", async () => {
+		/**
+		 * {
+		 *     let A = "a";
+		 *     let B = "b";
+		 *     A; // "a"
+		 *     B; // "b"
+		 * }
+		 */
 		const key1 = randomUUID();
 		const key2 = randomUUID();
 		const value1 = randomUUID();
@@ -77,6 +118,17 @@ describe("scopes", () => {
 	});
 
 	it("should inherit scope from outer scope", async () => {
+		/**
+		 * let foo = "bar";
+		 * {
+		 *     foo; // "bar"
+		 * }
+		 * {
+		 *     {
+		 *         foo; // "bar"
+		 *     }
+		 * }
+		 */
 		const key = randomUUID();
 		const value = randomUUID();
 		await bind(key, value);
@@ -86,7 +138,15 @@ describe("scopes", () => {
 		expect(nestedResult).to.equal(value);
 	})
 
-	it("should not mutate global scope through binding", async () => {
+	it("should not mutate global scope through binding (shadowing)", async () => {
+		/**
+		 * let foo = "bar";
+		 * {
+		 *     let foo = "baz";
+		 *     foo; // "baz"
+		 * }
+		 * foo; // "bar"
+		 */
 		const id = randomUUID();
 		const nestedValue = randomUUID();
 		const value = randomUUID();
@@ -97,6 +157,16 @@ describe("scopes", () => {
 	});
 
 	it("should not mutate a nested scope from an even more nested scope through binding", async () => {
+		/**
+		 * {
+		 *     let foo = "bar";
+		 *     {
+		 *         let foo = "baz";
+		 *         foo; // "baz"
+		 *     }
+		 *     foo; // "bar"
+		 * }
+		 */
 		const id = randomUUID();
 		const value = randomUUID();
 		const nestedValue = randomUUID();
@@ -110,6 +180,11 @@ describe("scopes", () => {
 	});
 
 	it("should be able to mutate bindings in the global scope", async () => {
+		/**
+		 * let foo = "bar";
+		 * foo = "baz";
+		 * foo; // "baz"
+		 */
 		const key = randomUUID();
 		const value = randomUUID();
 		const newValue = randomUUID();
@@ -119,6 +194,13 @@ describe("scopes", () => {
 	});
 
 	it("should be able to mutate bindings in a nested scope", async () => {
+		/**
+		 * {
+		 *     let foo = "bar";
+		 *     foo = "baz";
+		 *     foo; // "baz"
+		 * }
+		 */
 		const key = randomUUID();
 		const value = randomUUID();
 		const newValue = randomUUID();
@@ -131,6 +213,10 @@ describe("scopes", () => {
 	});
 
 	it("should cascade mutations down to nested scopes", async () => {
+		/**
+		 * let foo = "bar";
+		 * concurrently(foo = "baz", {foo;}); // "baz"
+		 */
 		const trace = [];
 		await bind("key", "foo");
 		trace.push("outer set foo");
@@ -161,6 +247,13 @@ describe("scopes", () => {
 	});
 
 	it("should be able to mutate global scope from nested scope if an identifier is not shadowed", async () => {
+		/**
+		 * let foo = "bar";
+		 * {
+		 *     foo = "baz";
+		 * }
+		 * foo; // "baz"
+		 */
 		const id = randomUUID();
 		const value = randomUUID();
 		const newValue = randomUUID();
@@ -173,6 +266,17 @@ describe("scopes", () => {
 	});
 
 	it("should be able to mutate nested scope from more nested scope if an identifier is not shadowed", async () => {
+		/**
+		 * let foo = "bar";
+		 * {
+		 *     let foo = "baz";
+		 *     {
+		 *         foo = "foobar";
+		 *     }
+		 *     foo; // "foobar"
+		 * }
+		 * foo; // "bar"
+		 */
 		const id = randomUUID();
 		const value = randomUUID();
 		const newValue = randomUUID();
@@ -188,6 +292,18 @@ describe("scopes", () => {
 	});
 
 	it("should not let concurrently mutated scopes affect each other", async () => {
+		/**
+		 * concurrently(
+		 *     {
+		 *         let foo = "bar"
+		 *         foo; // "bar"
+		 *     },
+		 *     {
+		 *         let foo = "baz"
+		 *         foo; // "baz"
+		 *     },
+		 * )
+		 */
 		const trace = [];
 		const futureA = declareScope(
 			() => bind("key", "foo")
