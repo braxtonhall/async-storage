@@ -64,7 +64,7 @@ const bind = <T>(identifier: string, value: T): T => {
 	}
 };
 
-const access = <T>(identifier: string): T => inBoundScope(identifier, getFromScope(identifier));
+const access = (identifier: string): unknown => inBoundScope(identifier, getFromScope(identifier));
 
 const mutate = <T>(identifier: string, value: T): T => inBoundScope(identifier, setInScope(identifier, value));
 

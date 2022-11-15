@@ -3,7 +3,7 @@ import scopes, {declareScope, scopedFunction, scopedMethod} from "../../src/scop
 import {sleep} from "../../src/util/sleep";
 import {randomUUID} from "crypto";
 
-const access = async (key: string): Promise<string> => scopes.access(key);
+const access = async (key: string): Promise<string> => scopes.access(key) as string;
 const bind = async (key: string, value: string): Promise<string> => scopes.bind(key, value);
 const mutate = async (key: string, value: string): Promise<string> => scopes.mutate(key, value);
 const isBound = async (key: string): Promise<boolean> => scopes.isBound(key);
