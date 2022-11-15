@@ -1,4 +1,4 @@
-import scopes from ".//proper-scopes";
+import scopes from "./proper";
 
 enum Identifiers {
 	Foo = "foo",
