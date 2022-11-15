@@ -86,7 +86,7 @@ describe("scopes", () => {
 		expect(nestedResult).to.equal(value);
 	})
 
-	it("should not mutate global scope", async () => {
+	it("should not mutate global scope through binding", async () => {
 		const id = randomUUID();
 		const nestedValue = randomUUID();
 		const value = randomUUID();
@@ -96,7 +96,7 @@ describe("scopes", () => {
 		expect(await access(id)).to.equal(value);
 	});
 
-	it("should not mutate a nested scope from an even more nested scope", async () => {
+	it("should not mutate a nested scope from an even more nested scope through binding", async () => {
 		const id = randomUUID();
 		const value = randomUUID();
 		const nestedValue = randomUUID();
@@ -107,6 +107,84 @@ describe("scopes", () => {
 			return Promise.all([futureResult, futureNestedResult]);
 		});
 		expect(result).to.deep.equal([value, nestedValue]);
+	});
+
+	it("should be able to mutate bindings in the global scope", async () => {
+		const key = randomUUID();
+		const value = randomUUID();
+		const newValue = randomUUID();
+		await bind(key, value);
+		await mutate(key, newValue);
+		expect(await access(key)).to.equal(newValue);
+	});
+
+	it("should be able to mutate bindings in a nested scope", async () => {
+		const key = randomUUID();
+		const value = randomUUID();
+		const newValue = randomUUID();
+		const result = await declareScope(async () => {
+			await bind(key, value);
+			await mutate(key, newValue);
+			return access(key);
+		});
+		expect(result).to.equal(newValue);
+	});
+
+	it("should cascade mutations down to nested scopes", async () => {
+		const trace = [];
+		await bind("key", "foo");
+		trace.push("outer set foo");
+
+		const innerScope = declareScope(
+			() => sleep(0)
+				.then(() => trace.push("inner start"))
+				.then(() => sleep(10))
+				.then(() => access("key"))
+				.then((res) => {
+					trace.push("inner get");
+					return res;
+				})
+		);
+
+		const outerScope = sleep(5)
+			.then(() => mutate("key", "bar"))
+			.then(() => trace.push("outer set bar"));
+
+		const [inner] = await Promise.all([innerScope, outerScope]);
+		expect(trace).to.deep.equal([
+			"outer set foo",
+			"inner start",
+			"outer set bar",
+			"inner get",
+		]);
+		expect(inner).to.equal("bar");
+	});
+
+	it("should be able to mutate global scope from nested scope if an identifier is not shadowed", async () => {
+		const id = randomUUID();
+		const value = randomUUID();
+		const newValue = randomUUID();
+		const newNewValue = randomUUID();
+		await bind(id, value);
+		await declareScope(() => mutate(id, newValue));
+		expect(await access(id)).to.equal(newValue);
+		await declareScope(() => declareScope(() => mutate(id, newNewValue)));
+		expect(await access(id)).to.equal(newNewValue);
+	});
+
+	it("should be able to mutate nested scope from more nested scope if an identifier is not shadowed", async () => {
+		const id = randomUUID();
+		const value = randomUUID();
+		const newValue = randomUUID();
+		const newNewValue = randomUUID();
+		await bind(id, value);
+		const result = await declareScope(async () => {
+			await bind(id, newValue);
+			await declareScope(async () => mutate(id, newNewValue));
+			return access(id);
+		});
+		expect(result).to.equal(newNewValue);
+		expect(await access(id)).to.equal(value);
 	});
 
 	it("should not let concurrently mutated scopes affect each other", async () => {
@@ -145,7 +223,9 @@ describe("scopes", () => {
 
 	it("should support the method decorator", async () => {
 		class Entry {
-			constructor(private key: string, private value: string) {}
+			constructor(private key: string, private value: string) {
+			}
+
 			@scopedMethod
 			public async point(): Promise<string> {
 				await bind(this.key, this.value);
