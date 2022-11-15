@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import scopes, {declareScope, scoped} from "../../src/decorators/naive-scopes";
+import scopes, {declareScope, scoped} from "../../src/scopes/naive";
 import {sleep} from "../../src/util/sleep";
 import {randomUUID} from "crypto";
 
