@@ -6,6 +6,7 @@ import {randomUUID} from "crypto";
 const access = async (key: string): Promise<string> => scopes.access(key);
 const bind = async (key: string, value: string): Promise<string> => scopes.bind(key, value);
 const mutate = async (key: string, value: string): Promise<string> => scopes.mutate(key, value);
+const isBound = async (key: string): Promise<boolean> => scopes.isBound(key);
 
 describe("scopes", () => {
 
@@ -377,5 +378,38 @@ describe("scopes", () => {
 		await bind(id, value);
 		expect(await entryPoint(id, nestedValue)).to.equal(nestedValue);
 		expect(await access(id)).to.equal(value);
+	});
+
+	it("should check if bound globally", async () => {
+		const key = randomUUID();
+		const beforeBinding = await isBound(key);
+		await bind(key, randomUUID());
+		expect(beforeBinding).to.be.false;
+		expect(await isBound(key)).to.be.true;
+	});
+
+	it("should check if bound in a nested scope", async () => {
+		const key = randomUUID();
+		const outerBefore = await isBound(key);
+		const [before, after] = await declareScope(async () => {
+			const beforeBinding = await isBound(key);
+			await bind(key, randomUUID());
+			const afterBinding = await isBound(key);
+			return [beforeBinding, afterBinding];
+		});
+		const outerAfter = await isBound(key);
+		expect(outerBefore).to.be.false;
+		expect(before).to.be.false;
+		expect(after).to.be.true;
+		expect(outerAfter).to.be.false;
+	});
+
+	it("should cascade result of binding predicate to nested scopes", async () => {
+		const key = randomUUID();
+		await bind(key, randomUUID());
+		const nested = await declareScope(() => isBound(key));
+		const doubleNested = await declareScope(() => declareScope(() => isBound(key)));
+		expect(nested).to.be.true;
+		expect(doubleNested).to.be.true;
 	});
 });

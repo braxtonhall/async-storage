@@ -33,7 +33,7 @@ const declareScope = <T extends PromiseLike<any>>(callback: () => T): T => {
 
 const localScope = (): Scope => localStorage.getStore() as Scope ?? globalScope;
 
-const boundScope = (identifier: string): Scope | undefined => {
+const boundScope = (identifier: string): Scope => {
 	const findScope = (scope: Scope): Scope | undefined => {
 		if (scope === undefined) {
 			throw new Error(`Identifier "${identifier}" is not bound`);

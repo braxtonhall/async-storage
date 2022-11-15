@@ -34,9 +34,7 @@ const localScope = (): Scope => localStorage.getStore() as Scope ?? globalScope;
 
 const boundScope = (identifier: string): Scope | undefined => {
 	const findScope = (scope: Scope): Scope | undefined => {
-		if (scope === undefined) {
-			new Error(`Identifier "${identifier}" is not bound`);
-		} else if (identifier in scope.bindings) {
+		if (scope === undefined || identifier in scope.bindings) {
 			return scope;
 		} else {
 			return findScope(scope.parentScope);
@@ -48,7 +46,14 @@ const boundScope = (identifier: string): Scope | undefined => {
 const setInScope = <T>(identifier: string, value: T) => (scope: Scope): T => scope.bindings[identifier] = value;
 const getFromScope = <T>(identifier: string) => (scope: Scope): T => scope.bindings[identifier] as T;
 
-const inBoundScope = <T>(identifier: string, callback: (scope: Scope) => T) => callback(boundScope(identifier));
+const inBoundScope = <T>(identifier: string, callback: (scope: Scope) => T) => {
+	const scope = boundScope(identifier);
+	if (scope) {
+		return callback(scope);
+	} else {
+		throw new Error(`Identifier "${identifier}" is not bound`);
+	}
+};
 
 const bind = <T>(identifier: string, value: T): T => {
 	const scope = localScope();
@@ -63,5 +68,7 @@ const access = <T>(identifier: string): T => inBoundScope(identifier, getFromSco
 
 const mutate = <T>(identifier: string, value: T): T => inBoundScope(identifier, setInScope(identifier, value));
 
+const isBound = (identifier: string): boolean => !!boundScope(identifier);
+
 export {scopedMethod, scopedFunction, declareScope};
-export default {bind, access, mutate};
+export default {bind, access, mutate, isBound};
